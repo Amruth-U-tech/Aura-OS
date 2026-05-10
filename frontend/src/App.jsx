@@ -18,6 +18,7 @@ import { EventBus, EventTypes } from "./events/eventBus";
 import { useAppState } from "./state/AppStateContext";
 import { getSoundCue, getAuraSoundCue } from "./ai/behavioralResponses";
 import { Logger } from "./utils/logger";
+import { usePWA } from "./hooks/usePWA";
 import "./App.css";
 
 // ---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const { state } = useAppState();
+  const { isOffline, isInstallable, isInstalling, installPWA } = usePWA();
 
   // ── Data Layer ─────────────────────────────────────────────────────────────
 
@@ -98,6 +100,7 @@ function App() {
   // ── Sound + Event Wiring ───────────────────────────────────────────────────
 
   useEffect(() => {
+    SoundEngine.setupUnlockListeners();
     const controller = new AbortController();
     loadTasks(controller.signal);
 
@@ -225,6 +228,11 @@ function App() {
         <div className="header-left">
           <h1 className="app-title">Aura OS</h1>
           <AuraStatus />
+          {isInstallable && (
+            <button className="install-btn" onClick={installPWA} disabled={isInstalling}>
+              {isInstalling ? '[ INSTALLING... ]' : '[ INSTALL ]'}
+            </button>
+          )}
         </div>
         <div className="header-right">
           <button 
@@ -282,6 +290,23 @@ function App() {
           <DisciplineMode />
         </aside>
       </main>
+
+      {/* OFFLINE FALLBACK OVERLAY */}
+      <AnimatePresence>
+        {isOffline && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="offline-overlay"
+          >
+            <div className="offline-content">
+              <h2 className="offline-title">[ SYSTEM OFFLINE ]</h2>
+              <p className="offline-text">Aura OS is disconnected. Core systems still available.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

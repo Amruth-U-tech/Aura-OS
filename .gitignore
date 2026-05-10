@@ -102,3 +102,5 @@ service-worker.js.map
 *.local
 
 frontend/public/sounds/
+
+icons/
