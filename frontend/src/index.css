@@ -1,0 +1,64 @@
+:root {
+  /* Solo Leveling HUD System Colors */
+  --bg-dark: #030712;         /* Deepest abyss blue/black */
+  --bg-panel: rgba(15, 23, 42, 0.65); /* Translucent HUD panel */
+  --bg-card: rgba(30, 41, 59, 0.5);   /* Secondary translucent */
+  
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  
+  /* System Glows */
+  --primary: #00e5ff;         /* System Cyan */
+  --primary-hover: #00b8d4;
+  --system-purple: #8b5cf6;   /* Magic/Aura */
+  
+  --success: #10b981;
+  --warning: #fbbf24;         /* System Gold */
+  --danger: #ef4444;          /* Boss/Warning Red */
+  --info: #3b82f6;
+  
+  /* Holographic Borders */
+  --border: rgba(0, 229, 255, 0.15);
+  --border-focus: rgba(0, 229, 255, 0.6);
+  --border-glow: 0 0 10px rgba(0, 229, 255, 0.2), inset 0 0 15px rgba(0, 229, 255, 0.05);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  /* subtle scanline/grid background can be applied in App.css */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+input, select {
+  font-family: inherit;
+  outline: none;
+}
+
+/* Scrollbar styling - Futuristic */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.3);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 229, 255, 0.6);
+}
