@@ -4,25 +4,66 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import taskRoutes from "./routes/task_routes.js";
 import cvRoutes from "./routes/cv_routes.js";
+import helmet from "helmet";
+import mongoSanitize from "express-mongo-sanitize";
+import morgan from "morgan";
+import { globalLimiter } from "./middleware/rateLimiter.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 dotenv.config();
+
+const MONGO_URI = process.env.MONGO_URI || process.env.mongo_URI || "mongodb://localhost:27017/aura_os_dev";
+const PORT = process.env.PORT || process.env.port || 5000;
+
+if (!process.env.MONGO_URI && !process.env.mongo_URI) {
+  console.warn("⚠️ Warning: MONGO_URI not found in .env, falling back to local database.");
+}
+
 mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(MONGO_URI)
     .then(() => console.log("MongoDB Connected"))
-    .catch((err) => console.log(err));
+    .catch((err) => {
+        console.error("MongoDB Connection Error:", err);
+        process.exit(1);
+    });
 
 const app = express();
 
+// 1. Security Headers
+app.use(helmet());
+
+// 2. Logging
+app.use(morgan("dev"));
+
+// 3. Rate Limiting
+app.use("/api/", globalLimiter);
+
+// 4. Body Parsers & CORS
 app.use(cors());
-app.use(express.json());
+// Limit payload size to prevent DOS
+app.use(express.json({ limit: '10kb' })); 
+
+// 5. Data Sanitization (No-SQL Injection protection)
+// Custom implementation to avoid 'Cannot set property query' crash in modern Express
+app.use((req, res, next) => {
+  if (req.body) req.body = mongoSanitize.sanitize(req.body, { replaceWith: '_' });
+  if (req.params) req.params = mongoSanitize.sanitize(req.params, { replaceWith: '_' });
+  if (req.headers) req.headers = mongoSanitize.sanitize(req.headers, { replaceWith: '_' });
+  // Safely skipping req.query because Express defines it as a getter-only property
+  next();
+});
 app.use("/api/tasks", taskRoutes);
 app.use("/api/cv", cvRoutes);
 
 app.get("/", (req, res) => {
-    res.send("Backend Running");
+    res.send("Aura OS Backend Secure & Running");
 });
 
-const PORT = process.env.PORT || 5000;
+// Handle undefined routes
+app.use(notFoundHandler);
+
+// Centralized Error Handling
+app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { sendSuccess, sendError } from '../utils/apiResponse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +13,7 @@ export const startExercise = (req, res) => {
   
   const validExercises = ['pushups', 'situps', 'squats'];
   if (!validExercises.includes(exercise)) {
-    return res.status(400).json({ message: "Invalid exercise type" });
+    return sendError(res, "Invalid exercise type", "INVALID_EXERCISE", 400);
   }
 
   const scriptPath = path.join(__dirname, '..', 'cv', `${exercise}.py`);
@@ -25,10 +26,6 @@ export const startExercise = (req, res) => {
 
   pythonProcess.stdout.on('data', (data) => {
     console.log(`[Python ${exercise}]: ${data.toString()}`);
-    if (data.toString().includes('SUCCESS')) {
-      // In a real app, we might use websockets to notify the frontend immediately.
-      // For now, the frontend will wait for the API response.
-    }
   });
 
   pythonProcess.stderr.on('data', (data) => {
@@ -38,9 +35,9 @@ export const startExercise = (req, res) => {
   pythonProcess.on('close', (code) => {
     console.log(`Python process for ${exercise} exited with code ${code}`);
     if (code === 0) {
-      res.status(200).json({ message: "Exercise completed successfully", status: "SUCCESS" });
+      sendSuccess(res, { message: "Exercise completed successfully", status: "SUCCESS" });
     } else {
-      res.status(500).json({ message: "Exercise aborted or failed", status: "ABORTED" });
+      sendError(res, "Exercise aborted or failed", "EXERCISE_FAILED", 500);
     }
   });
 };

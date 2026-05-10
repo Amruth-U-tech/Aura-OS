@@ -31,29 +31,31 @@ const isBoolean = (value) => typeof value === 'boolean';
 // ---------------------------------------------------------------------------
 export const validateTaskPayload = (task) => {
   if (!task || typeof task !== 'object') {
-    Logger.warn('Invalid task: not an object', { task });
+    Logger.warn('[Validation] Invalid task: not an object', { task });
     return false;
   }
   if (!isNonEmptyString(task._id)) {
-    Logger.warn('Invalid task: missing _id', { task });
+    Logger.warn('[Validation] Invalid task: missing _id', { task });
     return false;
   }
   if (!isNonEmptyString(task.title)) {
-    Logger.warn('Invalid task: missing or empty title', { task });
+    Logger.warn('[Validation] Invalid task: missing or empty title', { task });
     return false;
   }
   if (!isBoolean(task.completed)) {
-    Logger.warn('Invalid task: completed is not boolean', { task });
+    Logger.warn('[Validation] Invalid task: completed is not boolean', { task });
     return false;
   }
   if (!VALID_PRIORITIES.has(task.priority)) {
-    Logger.warn('Invalid task: unknown priority', { priority: task.priority });
+    Logger.warn('[Validation] Invalid task: unknown priority', { priority: task.priority });
     return false;
   }
   if (!VALID_CATEGORIES.has(task.category)) {
-    Logger.warn('Invalid task: unknown category', { category: task.category });
+    Logger.warn('[Validation] Invalid task: unknown category', { category: task.category });
     return false;
   }
+  
+  Logger.info('[Validation] Task payload validation succeeded for:', task._id);
   return true;
 };
 
@@ -64,10 +66,12 @@ export const validateTaskPayload = (task) => {
 // ---------------------------------------------------------------------------
 export const validateTaskArray = (data) => {
   if (!Array.isArray(data)) {
-    Logger.error('Expected task array from API, received:', data);
+    Logger.error('[Validation] Expected task array from API, received:', data);
     return [];
   }
-  return data.filter(validateTaskPayload);
+  const validTasks = data.filter(validateTaskPayload);
+  Logger.info(`[Validation] Array validation completed. Valid tasks: ${validTasks.length} / ${data.length}`);
+  return validTasks;
 };
 
 // ---------------------------------------------------------------------------

@@ -25,9 +25,19 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// Global response error interceptor
+// Global response interceptor
 api.interceptors.response.use(
-  response => response,
+  response => {
+    Logger.info('[API] Raw backend response:', response.data);
+    
+    // Robustly unwrap standard backend responses: { success: true, data: ... }
+    if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+      response.data = response.data.data;
+      Logger.info('[API] Normalized payload:', response.data);
+    }
+    
+    return response;
+  },
   error => {
     // Don't log or dispatch for intentional cancellations
     if (axios.isCancel(error)) {
