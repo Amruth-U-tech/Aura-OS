@@ -23,9 +23,10 @@ export function useFocusMode() {
   const enterFocus = useCallback(() => {
     setIsFocused(true);
     EventBus.dispatch(EventTypes.FOCUS_MODE_ENTERED);
-    SoundEngine.play('focus_enter');
-    // Start ambient after brief delay to let enter sound play first
-    setTimeout(() => SoundEngine.startAmbient('focus_ambient'), 600);
+    // 'aura_focus_shift' is the semantically correct key for mode transitions.
+    // 'focus_enter' / 'focus_ambient' are not in SOUND_CATALOG — focus ambience
+    // is intentionally excluded due to file size (1–18 MB); it loads on demand only.
+    SoundEngine.play('aura_focus_shift');
     Logger.info('useFocusMode — Focus Mode entered');
   }, []);
 
@@ -33,7 +34,7 @@ export function useFocusMode() {
     setIsFocused(false);
     EventBus.dispatch(EventTypes.FOCUS_MODE_EXITED);
     SoundEngine.stopAmbient(800);
-    SoundEngine.play('focus_exit');
+    SoundEngine.play('aura_focus_shift');
     Logger.info('useFocusMode — Focus Mode exited');
   }, []);
 

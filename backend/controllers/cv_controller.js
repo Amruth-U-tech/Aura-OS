@@ -23,6 +23,19 @@ export const startExercise = (req, res) => {
 
   // Spawn the python process
   const pythonProcess = spawn('python', [scriptPath, targetReps.toString()]);
+  let responded = false;
+
+  // Hard-kill timeout: if the Python process hasn't finished in 60s
+  // (camera error, hang, or device unavailable) terminate it so the
+  // HTTP request doesn't hang indefinitely on Render.
+  const killTimeout = setTimeout(() => {
+    if (!responded) {
+      responded = true;
+      pythonProcess.kill('SIGKILL');
+      console.error(`[CV] Process for ${exercise} killed after 60s timeout`);
+      sendError(res, "Exercise tracker timed out", "EXERCISE_TIMEOUT", 504);
+    }
+  }, 60000);
 
   pythonProcess.stdout.on('data', (data) => {
     console.log(`[Python ${exercise}]: ${data.toString()}`);
@@ -33,6 +46,9 @@ export const startExercise = (req, res) => {
   });
 
   pythonProcess.on('close', (code) => {
+    if (responded) return; // timeout already replied
+    responded = true;
+    clearTimeout(killTimeout);
     console.log(`Python process for ${exercise} exited with code ${code}`);
     if (code === 0) {
       sendSuccess(res, { message: "Exercise completed successfully", status: "SUCCESS" });

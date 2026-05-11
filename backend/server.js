@@ -33,13 +33,21 @@ const app = express();
 app.use(helmet());
 
 // 2. Logging
-app.use(morgan("dev"));
+// 'dev' format uses ANSI color codes that appear as garbage in Render's
+// plain-text log stream. 'combined' is the production-appropriate Apache format.
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // 3. Rate Limiting
 app.use("/api/", globalLimiter);
 
-// 4. Body Parsers & CORS
-app.use(cors());
+// 4. CORS — restrict to the deployed frontend origin in production.
+// In development, allow all origins for local tooling flexibility.
+const ALLOWED_ORIGIN = process.env.FRONTEND_URL || 'https://aura-os.netlify.app';
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? ALLOWED_ORIGIN : '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 // Limit payload size to prevent DOS
 app.use(express.json({ limit: '10kb' })); 
 

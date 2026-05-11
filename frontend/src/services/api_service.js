@@ -8,13 +8,14 @@
  * - Global error interception with EventBus notification
  * - Clean service interface preserving existing API surface
  * - Safe fallback to production Render backend if env var is missing
+ * - 20 s timeout + graceful cold-start UX for Render free-tier wake-up
  *
  * WHY cancellation: When a component unmounts mid-flight (e.g., navigating away
  *   from the dashboard while tasks are loading), the async callback can still
  *   call setTasks() on a destroyed component, causing React memory leak warnings
  *   and potentially corrupted state in adjacent still-mounted components.
  *
- * ENV VARIABLES (set in .env / .env.production / Vercel dashboard):
+ * ENV VARIABLES (set in .env / .env.production / Netlify / Vercel dashboard):
  *   VITE_API_URL — full base URL for the API, e.g. https://aura-os-d88w.onrender.com/api
  */
 import axios from "axios";
@@ -51,10 +52,19 @@ const resolveApiBaseUrl = () => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
-// Shared Axios instance with a safe timeout
+// ---------------------------------------------------------------------------
+// Cold-start tracking
+// Render free-tier instances sleep after inactivity. The first request after
+// a cold start can take 10–30 s. We dispatch BACKEND_WAKING once on the first
+// timeout so the UI can show "Waking Aura OS core systems..." instead of a
+// generic error. Subsequent timeouts fall through to normal error handling.
+// ---------------------------------------------------------------------------
+let _coldStartWarningFired = false;
+
+// Shared Axios instance — 20 s timeout to survive Render cold starts
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 20000,
 });
 
 // Global response interceptor
@@ -68,6 +78,8 @@ api.interceptors.response.use(
       Logger.info('[API] Normalized payload:', response.data);
     }
     
+    // Reset cold-start flag on any successful response
+    _coldStartWarningFired = false;
     return response;
   },
   error => {
@@ -76,8 +88,18 @@ api.interceptors.response.use(
       Logger.info('Request cancelled (component unmounted or superseded)');
       return Promise.reject(error);
     }
-    Logger.error('API request failed', error);
-    EventBus.dispatch(EventTypes.ERROR_OCCURRED, { message: 'Network error occurred' });
+
+    // Render cold-start: ECONNABORTED = timeout, code ERR_NETWORK covers cold-start
+    const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+    if (isTimeout && !_coldStartWarningFired) {
+      _coldStartWarningFired = true;
+      Logger.warn('[API] Backend timeout — likely Render cold start. Dispatching BACKEND_WAKING.');
+      EventBus.dispatch(EventTypes.BACKEND_WAKING, {});
+    } else if (!isTimeout) {
+      Logger.error('API request failed', error);
+      EventBus.dispatch(EventTypes.ERROR_OCCURRED, { message: 'Network error occurred' });
+    }
+
     return Promise.reject(error);
   }
 );

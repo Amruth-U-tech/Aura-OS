@@ -19,6 +19,7 @@ backend/dist/
 .env
 backend/.env
 frontend/.env
+docker/.env
 
 # =========================
 # PYTHON CACHE

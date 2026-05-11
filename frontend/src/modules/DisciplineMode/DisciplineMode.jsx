@@ -20,6 +20,26 @@ import { Logger } from '../../utils/logger';
 // ---------------------------------------------------------------------------
 const CV_BASE_URL = import.meta.env.VITE_CV_URL || 'http://localhost:8000';
 
+// ---------------------------------------------------------------------------
+// Environment gate — CV tracking is LOCAL-ONLY.
+// The FastAPI CV service requires a local camera and cannot run on Vercel.
+// In production all CV fetches, polling, and camera init are suppressed.
+// Quest tasks fall back to manual completion so XP / EventBus still fire.
+// ---------------------------------------------------------------------------
+const isLocalEnvironment =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' ||
+   window.location.hostname === '127.0.0.1');
+
+// Log CV mode once at module load (dev/debug only)
+if (import.meta.env.DEV || import.meta.env.VITE_DEBUG === 'true') {
+  Logger.info(
+    isLocalEnvironment
+      ? '[CV] Local tracking mode enabled'
+      : '[CV] Production deployment detected — tracker disabled safely'
+  );
+}
+
 const DAILY_QUEST = [
   { id: 'pushups', label: "10 Pushups", target: 10 },
   { id: 'situps', label: "10 Situps", target: 10 },
@@ -91,9 +111,13 @@ export default function DisciplineMode() {
     return () => clearInterval(timer);
   }, [isScheduled, scheduledTime, isQuestTriggered]);
 
-  // CV Polling
+  // CV Polling — LOCAL ONLY
+  // In production this effect returns immediately, preventing any fetch
+  // spam, memory leaks, or CPU overhead from a never-resolving interval.
   useEffect(() => {
+    if (!isLocalEnvironment) return; // ← hard gate: no polling in production
     if (!activeExercise) return;
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${CV_BASE_URL}/status`);
@@ -105,7 +129,7 @@ export default function DisciplineMode() {
           SoundEngine.play('xp_gain');
         }
       } catch (err) {
-        // Backend might be restarting or unreachable
+        // Backend might be restarting or unreachable — silently retry
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -128,8 +152,9 @@ export default function DisciplineMode() {
     setIsQuestTriggered(true);
     setCompletedQuests({});
     EventBus.dispatch(EventTypes.DISCIPLINE_MODE_ENTERED, { type: 'daily_quest' });
-    
-    SoundEngine.play('discipline_enter');
+    // 'aura_energy' is the correct catalog key for discipline/focus activation.
+    // 'discipline_enter' does not exist in SOUND_CATALOG.
+    SoundEngine.play('aura_energy');
     Logger.info('DisciplineMode — Daily Quest Triggered!');
   }, []);
 
@@ -140,12 +165,18 @@ export default function DisciplineMode() {
     
     EventBus.dispatch(EventTypes.DISCIPLINE_MODE_EXITED);
     EventBus.dispatch(EventTypes.XP_GAINED, { amount: 150 }); // Huge reward for daily routine
-    SoundEngine.play('victory');
+    // 'level_up' is the correct victory sound for mission completion.
+    // 'victory' does not exist in SOUND_CATALOG.
+    SoundEngine.play('level_up');
     Logger.info('DisciplineMode — mission complete');
   }, []);
 
   const handleAbortCamera = useCallback(async () => {
-    await fetch(`${CV_BASE_URL}/stop`, { method: 'POST' }).catch(() => {});
+    // Only call the CV stop endpoint when running locally — in production
+    // there is no CV process to signal and the fetch would 404-spam.
+    if (isLocalEnvironment) {
+      await fetch(`${CV_BASE_URL}/stop`, { method: 'POST' }).catch(() => {});
+    }
     setActiveExercise(null);
   }, []);
 
@@ -164,8 +195,23 @@ export default function DisciplineMode() {
 
   const startCVExercise = async (id, target) => {
     if (completedQuests[id] || activeExercise) return;
+
+    // -----------------------------------------------------------------------
+    // PRODUCTION MODE: manual completion path
+    // No CV fetches, no camera overlay, no activeExercise set.
+    // XP and EventBus still fire — the quest remains fully completable.
+    // -----------------------------------------------------------------------
+    if (!isLocalEnvironment) {
+      Logger.info(`[CV] Production manual completion: ${id}`);
+      setCompletedQuests(prev => ({ ...prev, [id]: true }));
+      SoundEngine.play('xp_gain');
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // LOCAL MODE: full OpenCV tracking path
+    // -----------------------------------------------------------------------
     setActiveExercise(id);
-    
     try {
       await fetch(`${CV_BASE_URL}/start`, {
         method: 'POST',
@@ -296,9 +342,44 @@ export default function DisciplineMode() {
                 })}
               </div>
 
-              <p style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem', marginTop: '1rem' }}>
-                System locked. Click an objective to begin optical tracking.
-              </p>
+              {/* CV Mode Notice */}
+              {isLocalEnvironment ? (
+                <p style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem', marginTop: '1rem' }}>
+                  System locked. Click an objective to begin optical tracking.
+                </p>
+              ) : (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem 1.25rem',
+                  border: '1px solid rgba(0, 229, 255, 0.15)',
+                  background: 'rgba(0, 229, 255, 0.04)',
+                  boxShadow: '0 0 20px rgba(0,229,255,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                  textAlign: 'center',
+                }}
+                >
+                  <span style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '0.6rem',
+                    letterSpacing: '0.2em',
+                    color: 'var(--primary)',
+                    opacity: 0.5,
+                  }}>
+                    [ AURA CV ENGINE — REMOTE MODE ]
+                  </span>
+                  <span style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '0.72rem',
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.7,
+                  }}>
+                    Realtime posture tracking requires local desktop mode.<br />
+                    <span style={{ color: 'rgba(0,229,255,0.5)' }}>Click any objective to confirm manually.</span>
+                  </span>
+                </div>
+              )}
 
               {allQuestsCompleted ? (
                 <motion.button

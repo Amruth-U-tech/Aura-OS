@@ -1,9 +1,15 @@
-const CACHE_NAME = 'aura-os-v2';
+const CACHE_NAME = 'aura-os-v3';
+// STATIC_ASSETS must ONLY contain files guaranteed to exist in the production
+// build's public/ directory. A single missing file causes cache.addAll() to
+// reject and aborts the entire service-worker install — breaking the PWA.
+// /vite.svg was removed: Aura OS does not use the Vite default favicon.
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/vite.svg'
+  '/favicon.svg',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {

@@ -1,0 +1,43 @@
+# ============================================================
+# Aura OS Backend — .dockerignore
+# ============================================================
+# Applied when building with context: .. (project root).
+# Only backend/ source is needed — everything else excluded.
+# ============================================================
+
+# ── Exclude the entire project except backend/ ───────────────
+frontend/
+docker/
+cv/
+data-analysis/
+.git/
+.github/
+*.md
+
+# ── Inside backend/ — exclude what Docker doesn't need ───────
+
+# Dependencies — reinstalled inside container via npm ci --omit=dev
+backend/node_modules/
+
+# Local env files — NEVER bake secrets into the image
+backend/.env
+backend/.env.local
+backend/.env.*.local
+
+# Python/OpenCV local subsystem — not deployed in the backend container
+backend/venv/
+backend/cv/
+backend/requirements.txt
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Editor / OS metadata
+backend/.DS_Store
+backend/Thumbs.db
+backend/.vscode/
+backend/.idea/
+
+# Test output
+backend/coverage/
+backend/*.log

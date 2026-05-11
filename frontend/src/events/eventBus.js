@@ -52,6 +52,10 @@ export const EventTypes = {
   COMPANION_MESSAGE:         'COMPANION_MESSAGE',
   // ── System events ─────────────────────────────────────────────────────────
   ERROR_OCCURRED:            'ERROR_OCCURRED',
+  // Dispatched by api_service when the first request times out — most likely
+  // a Render free-tier cold start (10–30 s wake-up delay). UI listens to this
+  // to show an immersive "Waking core systems..." state instead of an error.
+  BACKEND_WAKING:            'BACKEND_WAKING',
 };
 
 // Pre-computed O(1) validation set — avoids Object.values() on every call

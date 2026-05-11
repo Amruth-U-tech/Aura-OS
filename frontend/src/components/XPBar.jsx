@@ -27,6 +27,10 @@ export default function XPBar() {
   const [popups, setPopups] = useState([]);
   const popupIdRef    = useRef(0);
   const prevXpRef     = useRef(xp);
+  // Track active popup timers so we can clear them all on unmount.
+  // Without this, a setTimeout that fires after unmount calls setPopups
+  // on a destroyed component, causing React warnings.
+  const popupTimersRef = useRef(new Set());
 
   // When XP increases: fire glow pulse + queue a popup
   useEffect(() => {
@@ -38,9 +42,21 @@ export default function XPBar() {
       // Queue popup with unique id
       const id = ++popupIdRef.current;
       setPopups(prev => [...prev, { id, amount: gained }]);
-      setTimeout(() => setPopups(prev => prev.filter(p => p.id !== id)), 900);
+
+      // Store timer ID so unmount cleanup can cancel it
+      const timerId = setTimeout(() => {
+        setPopups(prev => prev.filter(p => p.id !== id));
+        popupTimersRef.current.delete(timerId);
+      }, 900);
+      popupTimersRef.current.add(timerId);
     }
     prevXpRef.current = xp;
+
+    // Cleanup: cancel any pending popup timers when this effect re-runs or component unmounts
+    return () => {
+      popupTimersRef.current.forEach(id => clearTimeout(id));
+      popupTimersRef.current.clear();
+    };
   }, [xp, glowControls]);
 
   return (

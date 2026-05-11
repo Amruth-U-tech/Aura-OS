@@ -1,0 +1,45 @@
+# ============================================================
+# Aura OS Frontend — .dockerignore
+# ============================================================
+# Applied when building with context: .. (project root).
+# Only frontend/ is needed — everything else is excluded.
+# Docker reads this file from the build context root.
+# ============================================================
+
+# ── Exclude the entire project except frontend/ ──────────────
+backend/
+docker/
+cv/
+data-analysis/
+.git/
+.github/
+*.md
+
+# ── Inside frontend/ — exclude what Docker doesn't need ──────
+
+# Generated build output — rebuilt inside the container
+frontend/dist/
+frontend/.cache/
+
+# Local dependencies — reinstalled inside the container via npm ci
+frontend/node_modules/
+
+# Local environment files — secrets injected at runtime, not baked in
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Editor / OS metadata
+frontend/.DS_Store
+frontend/Thumbs.db
+frontend/.vscode/
+frontend/.idea/
+
+# Test output
+frontend/coverage/
+
+# Python artifacts (shouldn't be here, but guard anyway)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.egg-info/

@@ -1,0 +1,126 @@
+# ============================================================
+# Aura OS — Docker Compose
+# Local development orchestration
+# ============================================================
+#
+# Usage:
+#   cp docker/.env.example docker/.env   # first-time setup
+#   docker compose up                     # start both services
+#   docker compose up --build             # rebuild + start
+#   docker compose down                   # stop + remove containers
+#
+# Services:
+#   frontend  → http://localhost:5173  (Vite dev server, hot reload)
+#   backend   → http://localhost:5000  (Express REST API)
+#
+# Production containers (nginx + pre-built assets):
+#   docker compose --profile prod up
+# ============================================================
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # BACKEND — Express + MongoDB Atlas
+  # ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ..                         # project root as build context
+      dockerfile: docker/backend.Dockerfile
+    container_name: aura-os-backend
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      # Mongo URI — loaded from docker/.env (never hardcoded here)
+      MONGO_URI: ${MONGO_URI}
+      # CORS — allow the frontend container origin in Docker
+      FRONTEND_URL: http://localhost:5173
+
+    # Load secrets from docker/.env (git-ignored)
+    env_file:
+      - .env
+
+    networks:
+      - aura-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ──────────────────────────────────────────────────────────
+  # FRONTEND — Vite dev server (hot reload)
+  # Default profile: local development
+  # ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: dev                         # dev stage: Vite hot reload
+    container_name: aura-os-frontend
+    restart: unless-stopped
+
+    ports:
+      - "5173:5173"
+
+    environment:
+      # In Docker Compose, the backend is reachable by service name.
+      # The Vite proxy in vite.config.js strips /api and forwards to
+      # this URL, so all /api/* requests reach the backend container.
+      VITE_API_URL: http://backend:5000/api
+      VITE_CV_URL: http://localhost:8000   # CV runs on host, not containerized
+      VITE_DEBUG: "false"
+
+    # Volume mount: sync local source into container for hot reload.
+    # node_modules is excluded so the container's own install is used.
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules                 # anonymous volume: protects container's node_modules
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - aura-network
+
+  # ──────────────────────────────────────────────────────────
+  # FRONTEND (PROD) — nginx serving pre-built static assets
+  # Only starts when --profile prod is specified.
+  # Requires build args for VITE_API_URL to be baked in.
+  # ──────────────────────────────────────────────────────────
+  frontend-prod:
+    profiles:
+      - prod
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: prod
+      args:
+        # Build-time vars baked into the JS bundle by Vite
+        VITE_API_URL: ${VITE_API_URL:-https://aura-os-d88w.onrender.com/api}
+        VITE_CV_URL: ${VITE_CV_URL:-https://aura-os-d88w.onrender.com}
+        VITE_DEBUG: "false"
+    container_name: aura-os-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "8080:80"                         # nginx on port 80 → host 8080
+    depends_on:
+      - backend
+    networks:
+      - aura-network
+
+# ──────────────────────────────────────────────────────────
+# SHARED NETWORK
+# Bridge network so services resolve each other by name
+# (e.g., 'backend' resolves to the backend container IP)
+# ──────────────────────────────────────────────────────────
+networks:
+  aura-network:
+    driver: bridge

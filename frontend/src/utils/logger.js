@@ -16,8 +16,10 @@
 // ---------------------------------------------------------------------------
 const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 
-// Active minimum level — raise to 'warn' in staging, 'error' in production
-const CURRENT_LEVEL = process.env.NODE_ENV === 'production' ? LOG_LEVELS.error : LOG_LEVELS.debug;
+// Active minimum level — raise to 'warn' in staging, 'error' in production.
+// import.meta.env.PROD is Vite's canonical production boolean — always reliable
+// in browser bundles. process.env.NODE_ENV works too but is a Node.js pattern.
+const CURRENT_LEVEL = import.meta.env.PROD ? LOG_LEVELS.error : LOG_LEVELS.debug;
 
 // ---------------------------------------------------------------------------
 // THROTTLE REGISTRY

@@ -33,6 +33,8 @@ function App() {
   const [tasks,  setTasks]  = useState([]);
   const [filter, setFilter] = useState("All");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  // Tracks Render free-tier cold-start state — shown instead of a crash
+  const [isColdStart, setIsColdStart] = useState(false);
 
   const { state } = useAppState();
   const { isOffline, isInstallable, isInstalling, installPWA } = usePWA();
@@ -102,7 +104,10 @@ function App() {
   useEffect(() => {
     SoundEngine.setupUnlockListeners();
     const controller = new AbortController();
-    loadTasks(controller.signal);
+
+    // Await loadTasks so we can clear the cold-start overlay when it resolves
+    // (whether tasks loaded successfully or returned the safe empty fallback).
+    loadTasks(controller.signal).finally(() => setIsColdStart(false));
 
     // XP gain → xp_gain chime
     // WHY xp_gain (not 'complete' cue): the completion sound from getSoundCue()
@@ -143,6 +148,12 @@ function App() {
       if (cue) SoundEngine.play(cue);
     });
 
+    // Render cold-start detection: api_service dispatches this on first timeout.
+    // Show the waking overlay instead of surfacing a raw network error.
+    const unsubWaking = EventBus.on(EventTypes.BACKEND_WAKING, () => {
+      setIsColdStart(true);
+    });
+
     return () => {
       controller.abort();
       unsubXP();
@@ -151,6 +162,7 @@ function App() {
       unsubFocusExit();
       unsubDisciplineEnter();
       unsubDisciplineExit();
+      unsubWaking();
     };
   }, [loadTasks]);
 
@@ -303,6 +315,110 @@ function App() {
             <div className="offline-content">
               <h2 className="offline-title">[ SYSTEM OFFLINE ]</h2>
               <p className="offline-text">Aura OS is disconnected. Core systems still available.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* RENDER COLD-START OVERLAY */}
+      {/* Shown when the Render free-tier backend is waking from sleep (10–30 s). */}
+      {/* Clears automatically once loadTasks() resolves — no user action needed. */}
+      <AnimatePresence>
+        {isColdStart && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.6 } }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 8888,
+              background: 'rgba(5, 8, 20, 0.97)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1.5rem',
+              pointerEvents: 'none',
+            }}
+          >
+            {/* Scan-line shimmer */}
+            <motion.div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(0deg, rgba(0,229,255,0.03) 1px, transparent 1px)',
+                backgroundSize: '100% 5px',
+                pointerEvents: 'none',
+              }}
+              animate={{ backgroundPosition: ['0% 0%', '0% 100%'] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+            />
+
+            {/* Pulsing orb */}
+            <motion.div
+              animate={{ opacity: [0.4, 1, 0.4], scale: [0.95, 1.05, 0.95] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                border: '2px solid rgba(0,229,255,0.5)',
+                boxShadow: '0 0 40px rgba(0,229,255,0.3), inset 0 0 20px rgba(0,229,255,0.1)',
+                background: 'radial-gradient(circle, rgba(0,229,255,0.15) 0%, transparent 70%)',
+              }}
+            />
+
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <motion.div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: '0.6rem',
+                  letterSpacing: '0.3em',
+                  color: 'rgba(0,229,255,0.5)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                AURA OS — CORE SYSTEMS
+              </motion.div>
+
+              <motion.div
+                animate={{ opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: '1.1rem',
+                  color: 'var(--primary, #00e5ff)',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                Waking Aura OS core systems...
+              </motion.div>
+
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '0.7rem',
+                color: 'rgba(255,255,255,0.25)',
+                letterSpacing: '0.1em',
+                marginTop: '0.25rem',
+              }}>
+                Backend initializing — please stand by.
+              </div>
+            </div>
+
+            {/* Animated loading bar */}
+            <div style={{
+              width: '220px',
+              height: '2px',
+              background: 'rgba(0,229,255,0.1)',
+              borderRadius: '1px',
+              overflow: 'hidden',
+            }}>
+              <motion.div
+                style={{ height: '100%', background: 'rgba(0,229,255,0.6)', borderRadius: '1px' }}
+                animate={{ x: ['-100%', '100%'] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+              />
             </div>
           </motion.div>
         )}
