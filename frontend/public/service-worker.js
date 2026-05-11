@@ -43,9 +43,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // ---------------------------------------------------------------------------
   // API Requests: Network First, NO Cache Fallback
-  // Let the frontend's axios interceptors handle offline failures natively
-  if (url.pathname.startsWith('/api/') || url.port === '5000') {
+  // Detect API traffic by:
+  //   • Path prefix /api/ (covers both dev proxy and production)
+  //   • Port 5000 (local Express dev server)
+  //   • Render production hostname (aura-os-d88w.onrender.com)
+  // Let the frontend's axios interceptors handle offline failures natively.
+  // ---------------------------------------------------------------------------
+  const isApiRequest =
+    url.pathname.startsWith('/api/') ||
+    url.port === '5000' ||
+    url.hostname === 'aura-os-d88w.onrender.com';
+
+  if (isApiRequest) {
     event.respondWith(
       fetch(request).catch((err) => {
         console.log('[PWA] Offline fallback activated for API request:', request.url);

@@ -2,22 +2,54 @@
  * API Service (Final Production-Grade)
  *
  * Features:
+ * - Environment-based API URL via import.meta.env.VITE_API_URL
  * - AbortController-based request cancellation (prevents stale state updates)
  * - Response validation via validateTaskArray/validateTaskPayload
  * - Global error interception with EventBus notification
  * - Clean service interface preserving existing API surface
+ * - Safe fallback to production Render backend if env var is missing
  *
  * WHY cancellation: When a component unmounts mid-flight (e.g., navigating away
  *   from the dashboard while tasks are loading), the async callback can still
  *   call setTasks() on a destroyed component, causing React memory leak warnings
  *   and potentially corrupted state in adjacent still-mounted components.
+ *
+ * ENV VARIABLES (set in .env / .env.production / Vercel dashboard):
+ *   VITE_API_URL — full base URL for the API, e.g. https://aura-os-d88w.onrender.com/api
  */
 import axios from "axios";
 import { Logger } from "../utils/logger";
 import { EventBus, EventTypes } from "../events/eventBus";
 import { validateTaskPayload, validateTaskArray } from "../utils/validation";
 
-const API_BASE_URL = "http://localhost:5000/api";
+// ---------------------------------------------------------------------------
+// Resolve API base URL from Vite environment at build time.
+// Priority:  VITE_API_URL  →  production Render fallback
+// ---------------------------------------------------------------------------
+const PRODUCTION_FALLBACK = "https://aura-os-d88w.onrender.com/api";
+
+const resolveApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+
+  if (!envUrl) {
+    // Only surface this warning in dev/debug mode; never crashes the app.
+    if (import.meta.env.VITE_DEBUG === "true" || import.meta.env.DEV) {
+      console.warn(
+        "[API] VITE_API_URL is not set. Falling back to production Render backend:",
+        PRODUCTION_FALLBACK
+      );
+    }
+    return PRODUCTION_FALLBACK;
+  }
+
+  if (import.meta.env.VITE_DEBUG === "true" || import.meta.env.DEV) {
+    console.log("[API] Using backend:", envUrl);
+  }
+
+  return envUrl;
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 // Shared Axios instance with a safe timeout
 const api = axios.create({

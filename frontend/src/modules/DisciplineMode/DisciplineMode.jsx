@@ -12,6 +12,14 @@ import { SoundEngine } from '../../services/soundEngine';
 import { APIService } from '../../services/api_service';
 import { Logger } from '../../utils/logger';
 
+// ---------------------------------------------------------------------------
+// CV backend base URL — resolved from Vite environment at build time.
+// .env (local):       VITE_CV_URL=http://localhost:8000
+// .env.production:    VITE_CV_URL=https://aura-os-d88w.onrender.com
+// Falls back to localhost so local dev works even without an .env file.
+// ---------------------------------------------------------------------------
+const CV_BASE_URL = import.meta.env.VITE_CV_URL || 'http://localhost:8000';
+
 const DAILY_QUEST = [
   { id: 'pushups', label: "10 Pushups", target: 10 },
   { id: 'situps', label: "10 Situps", target: 10 },
@@ -23,7 +31,7 @@ const CVCameraStream = memo(({ onAbort }) => {
   return (
     <div style={{ position: 'relative', width: '640px', height: '480px', border: '2px solid var(--primary)', boxShadow: '0 0 40px rgba(0,229,255,0.2)' }}>
       <img 
-        src="http://localhost:8000/video_feed" 
+        src={`${CV_BASE_URL}/video_feed`} 
         alt="CV Tracking Active" 
         style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
       />
@@ -88,10 +96,10 @@ export default function DisciplineMode() {
     if (!activeExercise) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch('http://localhost:8000/status');
+        const res = await fetch(`${CV_BASE_URL}/status`);
         const data = await res.json();
         if (data.active && data.completed) {
-          await fetch('http://localhost:8000/stop', { method: 'POST' });
+          await fetch(`${CV_BASE_URL}/stop`, { method: 'POST' });
           setCompletedQuests(prev => ({ ...prev, [activeExercise]: true }));
           setActiveExercise(null);
           SoundEngine.play('xp_gain');
@@ -137,7 +145,7 @@ export default function DisciplineMode() {
   }, []);
 
   const handleAbortCamera = useCallback(async () => {
-    await fetch('http://localhost:8000/stop', { method: 'POST' }).catch(() => {});
+    await fetch(`${CV_BASE_URL}/stop`, { method: 'POST' }).catch(() => {});
     setActiveExercise(null);
   }, []);
 
@@ -159,7 +167,7 @@ export default function DisciplineMode() {
     setActiveExercise(id);
     
     try {
-      await fetch('http://localhost:8000/start', {
+      await fetch(`${CV_BASE_URL}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exercise: id, targetReps: target })
