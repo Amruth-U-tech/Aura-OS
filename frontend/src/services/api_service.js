@@ -112,8 +112,11 @@ export const APIService = {
   getTasks: async (signal) => {
     try {
       const response = await api.get('/tasks', { signal });
+      if (response.data.progression) {
+        EventBus.dispatch('PROGRESSION_UPDATED', { progression: response.data.progression });
+      }
       // RESPONSE VALIDATION: filter out any malformed documents before they enter state
-      return validateTaskArray(response.data);
+      return validateTaskArray(response.data.tasks || response.data);
     } catch (error) {
       if (!axios.isCancel(error)) Logger.error('getTasks failed', error);
       return []; // Safe empty fallback
@@ -144,14 +147,25 @@ export const APIService = {
    */
   toggleTask: async (id, signal) => {
     const response = await api.patch(`/tasks/${id}/toggle`, {}, { signal });
-    if (!validateTaskPayload(response.data)) {
+    const taskData = response.data.task || response.data;
+    if (!validateTaskPayload(taskData)) {
       throw new Error('Server returned an invalid task object after toggle');
     }
-    if (response.data.completed) {
-      EventBus.dispatch(EventTypes.TASK_COMPLETED, { task: response.data });
-      EventBus.dispatch(EventTypes.XP_GAINED, { amount: 10 });
+    if (response.data.progression) {
+       EventBus.dispatch('PROGRESSION_UPDATED', { progression: response.data.progression });
     }
-    return response.data;
+    if (taskData.completed) {
+      EventBus.dispatch(EventTypes.TASK_COMPLETED, { task: taskData });
+      if (response.data.event && response.data.event.xpReward) {
+         EventBus.dispatch(EventTypes.XP_GAINED, { 
+           amount: response.data.event.xpReward, 
+           messages: response.data.event.messages 
+         });
+      } else {
+         EventBus.dispatch(EventTypes.XP_GAINED, { amount: 10 }); // Fallback
+      }
+    }
+    return taskData;
   },
 
   deleteTask: async (id, signal) => {

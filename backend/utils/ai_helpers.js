@@ -20,11 +20,15 @@ export const detectCategory = (text) => {
 export const detectPriority = (text) => {
   const lower = text.toLowerCase();
 
+  // AI-powered task validation architecture hooks can be integrated here in the future
+  if (lower.match(/\b(transformational|mission critical|life changing|master|dominate)\b/i)) {
+    return "Elite";
+  }
   if (lower.match(/\b(exam|assignment|deadline|urgent|asap|important)\b/i)) {
     return "High";
   }
   if (lower.match(/\b(project|meeting|review|soon)\b/i)) {
-    return "Medium";
+    return "Normal";
   }
 
   return "Low";

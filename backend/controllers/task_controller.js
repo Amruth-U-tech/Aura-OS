@@ -1,7 +1,10 @@
 import Task from "../models/task.js";
+import Progression from "../models/progression.js";
 import { detectCategory, detectPriority } from "../utils/ai_helpers.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import progressionEngine from "../services/progressionEngine.js";
+import { EventBus, EventTypes } from "../events/eventBus.js";
 
 // @desc    Get all tasks with filtering
 // @route   GET /api/tasks
@@ -15,22 +18,36 @@ export const getTasks = asyncHandler(async (req, res) => {
 
   let tasks = await Task.find(query).sort({ createdAt: -1 });
 
+  let progression = await Progression.findOne({ userId: "default_user" });
+  if (!progression) {
+    progression = await Progression.create({});
+  }
+
   // Check for failed tasks
   const now = new Date();
-  let tasksUpdated = false;
+  let newlyFailed = 0;
   for (let task of tasks) {
     if (!task.completed && !task.failed && task.deadlineAt && task.deadlineAt < now) {
       task.failed = true;
       await task.save();
-      tasksUpdated = true;
+      newlyFailed++;
     }
   }
 
-  if (tasksUpdated) {
+  if (newlyFailed > 0) {
+    // Use progressionEngine to apply penalty and decay logic
+    await progressionEngine.handleTaskFailure(progression, newlyFailed);
+  } else if (progression.decayActive) {
+    // Apply periodic decay
+    await progressionEngine.applyDecayIfNeeded(progression);
+  }
+
+  // Refresh tasks after updates
+  if (newlyFailed > 0) {
     tasks = await Task.find(query).sort({ createdAt: -1 });
   }
 
-  sendSuccess(res, tasks);
+  sendSuccess(res, { tasks, progression });
 });
 
 // @desc    Create a task
@@ -65,8 +82,8 @@ export const createTask = asyncHandler(async (req, res) => {
     title,
     category,
     priority,
-    deadlineType: deadlineType || "None",
-    deadlineValue: deadlineValue || "",
+    deadlineType,
+    deadlineValue,
     deadlineAt
   });
 
@@ -105,10 +122,30 @@ export const toggleTaskCompletion = asyncHandler(async (req, res) => {
     return sendError(res, "Task not found", "NOT_FOUND", 404);
   }
 
-  task.completed = !task.completed;
-  await task.save();
+  // Toggle task completion using progression engine
+  const progression = await Progression.findOne({ userId: "default_user" }) || await Progression.create({});
 
-  sendSuccess(res, task);
+  // Check for duplicate rapid toggles
+  if (progressionEngine.isDuplicateCompletion(task)) {
+      return sendError(res, "Duplicate completion detected", "DUPLICATE_ERROR", 429);
+  }
+
+  // Toggle task completion using progression engine
+  if (!task.completed) {
+      task.completed = true;
+      await task.save();
+      const { xpReward, messages } = await progressionEngine.handleTaskCompletion(task, progression);
+      // Dispatch events for UI and sound
+      EventBus.dispatch('PROGRESSION_UPDATED', { progression });
+      EventBus.dispatch(EventTypes.XP_GAINED, { xp: xpReward, messages });
+      sendSuccess(res, { task, progression, event: { xpReward, messages } });
+  } else {
+      task.completed = false;
+      await task.save();
+      sendSuccess(res, { task, progression });
+  }
+  await progression.save();
+  return;
 });
 
 // @desc    Delete a task

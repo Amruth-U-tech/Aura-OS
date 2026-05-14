@@ -7,10 +7,15 @@ const taskSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // Timestamp of the last completion toggle (used for anti-abuse duplicate detection)
+    lastToggle: {
+      type: Date,
+      default: null,
+    },
     priority: {
       type: String,
-      enum: ["Low", "Medium", "High"],
-      default: "Medium",
+      enum: ["Low", "Normal", "High", "Elite"],
+      default: "Normal",
     },
     category: {
       type: String,
@@ -21,10 +26,14 @@ const taskSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    completedAt: {
+      type: Date,
+      default: null,
+    },
     deadlineType: {
       type: String,
       enum: ["None", "Hours", "ExactTime"],
-      default: "None",
+      default: "Hours",
     },
     deadlineValue: {
       type: String,

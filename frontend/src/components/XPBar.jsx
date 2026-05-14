@@ -22,7 +22,7 @@ import {
 } from '../animations/xpAnimations';
 
 export default function XPBar() {
-  const { xp, level, xpPercentage, showLevelUp } = useXPSystem();
+  const { xp, level, xpPercentage, showLevelUp, decayActive, streakDays } = useXPSystem();
   const glowControls  = useAnimation();
   const [popups, setPopups] = useState([]);
   const popupIdRef    = useRef(0);
@@ -64,7 +64,7 @@ export default function XPBar() {
 
       {/* Header row */}
       <div className="xp-bar-header">
-        <span className="xp-label">Level {level}</span>
+        <span className="xp-label">Level {level} {streakDays > 0 ? <span style={{color: 'var(--warning)', marginLeft: '0.5rem'}}>🔥 {streakDays} Day Streak</span> : ''}</span>
 
         {/* XP counter — fades through on value change */}
         <AnimatePresence mode="popLayout" initial={false}>
@@ -82,7 +82,7 @@ export default function XPBar() {
       </div>
 
       {/* Track */}
-      <div className="xp-track">
+      <div className={`xp-track ${decayActive ? 'decay-active' : ''}`}>
         {/*
           WIDTH via CSS transition on inline style — simplest approach,
           zero conflict with the glow animate prop below.

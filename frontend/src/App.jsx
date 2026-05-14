@@ -58,6 +58,7 @@ function App() {
       if (memeCue) SoundEngine.play(memeCue);
     } catch (err) {
       Logger.error("addTask — failed", err);
+      throw err;
     }
   }, []);
 
@@ -173,7 +174,8 @@ function App() {
       switch (filter) {
         case "Active":        return !task.completed;
         case "Completed":     return task.completed;
-        case "High Priority": return task.priority === "High";
+        case "Elite Priority":return task.priority === "Elite";
+        case "High Priority": return task.priority === "High" || task.priority === "Elite";
         case "Work":          return task.category === "Work";
         case "Personal":      return task.category === "Personal";
         default:              return true;

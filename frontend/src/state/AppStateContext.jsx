@@ -80,16 +80,17 @@ function playerReducer(state, action) {
 
 function xpReducer(state, action) {
   switch (action.type) {
-    case 'ADD_XP': {
-      const safeAmount = Number(action.payload);
-      if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
-        Logger.warn('xpReducer — invalid XP payload rejected', { payload: action.payload });
-        return state;
-      }
-      const newXp    = state.xp + safeAmount;
-      const newLevel = Math.floor(newXp / 100) + 1;
-      if (state.xp === newXp && state.level === newLevel) return state; // EQUALITY GUARD
-      return maybeFreeze({ xp: newXp, level: newLevel });
+    case 'SYNC_PROGRESSION': {
+      const p = action.payload;
+      if (!p) return state;
+      return maybeFreeze({ 
+        xp: p.xp, 
+        level: p.level,
+        streakDays: p.streakDays || 0,
+        decayActive: p.decayActive || false,
+        failureChain: p.failureChain || 0,
+        recoveryProgress: p.recoveryProgress || 0
+      });
     }
     default:
       return state;
@@ -102,7 +103,7 @@ function xpReducer(state, action) {
 export function AppStateProvider({ children }) {
   const [themeState, dispatchTheme] = useReducer(themeReducer, maybeFreeze({ theme: 'default' }));
   const [modeState,  dispatchMode]  = useReducer(modeReducer,  maybeFreeze({ mode: 'standard' }));
-  const [xpState,    dispatchXP]    = useReducer(xpReducer,    maybeFreeze({ xp: 0, level: 1 }));
+  const [xpState,    dispatchXP]    = useReducer(xpReducer,    maybeFreeze({ xp: 0, level: 1, streakDays: 0, decayActive: false, failureChain: 0, recoveryProgress: 0 }));
   const [playerState, dispatchPlayer] = useReducer(playerReducer, maybeFreeze({
     name: localStorage.getItem('aura_player_name') || '',
     bio: localStorage.getItem('aura_player_bio') || '',
@@ -111,9 +112,13 @@ export function AppStateProvider({ children }) {
   }));
 
   useEffect(() => {
-    const unsubXP = EventBus.on(EventTypes.XP_GAINED, (payload) => {
-      dispatchXP({ type: 'ADD_XP', payload: payload?.amount });
+    const unsubProgression = EventBus.on('PROGRESSION_UPDATED', (payload) => {
+      if (payload && payload.progression) {
+        dispatchXP({ type: 'SYNC_PROGRESSION', payload: payload.progression });
+      }
     });
+    // We remove ADD_XP dispatch from XP_GAINED since progression sync handles it
+    // Sound engine still listens to XP_GAINED independently
     const unsubFocusEnter = EventBus.on(EventTypes.FOCUS_MODE_ENTERED, () => {
       dispatchTheme({ type: 'SET_THEME', payload: 'focus' });
       dispatchMode({ type: 'SET_MODE', payload: 'discipline' });
@@ -122,7 +127,7 @@ export function AppStateProvider({ children }) {
       dispatchTheme({ type: 'SET_THEME', payload: 'default' });
       dispatchMode({ type: 'SET_MODE', payload: 'standard' });
     });
-    return () => { unsubXP(); unsubFocusEnter(); unsubFocusExit(); };
+    return () => { unsubProgression(); unsubFocusEnter(); unsubFocusExit(); };
   }, []);
 
   return (
@@ -208,7 +213,7 @@ export function useAppState() {
   const dispatchers = useMemo(() => ({
     SET_THEME: themeCtx.dispatch,
     SET_MODE:  modeCtx.dispatch,
-    ADD_XP:    xpCtx.dispatch,
+    SYNC_PROGRESSION: xpCtx.dispatch,
     SET_PLAYER: playerCtx.dispatch,
   }), [themeCtx.dispatch, modeCtx.dispatch, xpCtx.dispatch, playerCtx.dispatch]);
 

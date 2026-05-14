@@ -40,14 +40,27 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 // 3. Rate Limiting
 app.use("/api/", globalLimiter);
 
-// 4. CORS — restrict to the deployed frontend origin in production.
-// In development, allow all origins for local tooling flexibility.
-const ALLOWED_ORIGIN = process.env.FRONTEND_URL || 'https://aura-os.netlify.app';
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? ALLOWED_ORIGIN : '*',
+// 4. CORS — environment-aware whitelist for local dev + production
+const allowedOrigins = [
+  'https://aura-osv1.netlify.app',
+  'http://localhost:4173',
+  'http://localhost:5173',
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy: origin not allowed'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 // Limit payload size to prevent DOS
 app.use(express.json({ limit: '10kb' })); 
 

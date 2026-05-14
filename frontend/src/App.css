@@ -593,8 +593,10 @@ body::after {
   border: 1px solid;
 }
 
+.priority-Elite    { background: rgba(139,92,246,0.15); color: #c084fc; border-color: rgba(139,92,246,0.5); box-shadow: 0 0 10px rgba(139,92,246,0.4); text-shadow: 0 0 5px rgba(139,92,246,0.5); }
 .priority-High     { background: rgba(239,68,68,0.1);   color: var(--danger);  border-color: rgba(239,68,68,0.3); }
 .priority-Medium   { background: rgba(251,191,36,0.1);  color: var(--warning); border-color: rgba(251,191,36,0.3); }
+.priority-Normal   { background: rgba(251,191,36,0.1);  color: var(--warning); border-color: rgba(251,191,36,0.3); }
 .priority-Low      { background: rgba(16,185,129,0.1);  color: var(--success); border-color: rgba(16,185,129,0.3); }
 .category-Work     { background: rgba(59,130,246,0.1);  color: #60a5fa;        border-color: rgba(59,130,246,0.3); }
 .category-Personal { background: rgba(139,92,246,0.1);  color: #a78bfa;        border-color: rgba(139,92,246,0.3); }

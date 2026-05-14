@@ -8,22 +8,29 @@
  * - Form entrance animation on mount
  */
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { buttonTapVariants } from '../animations/auraTransitions';
 
 export default function TaskForm({ onAdd }) {
   const [title,   setTitle]   = useState('');
   const [focused, setFocused] = useState(false);
-  const [deadlineType, setDeadlineType] = useState('None');
-  const [deadlineValue, setDeadlineValue] = useState('');
+  const [deadlineType, setDeadlineType] = useState('Hours');
+  const [deadlineValue, setDeadlineValue] = useState('1');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd(title, deadlineType, deadlineValue);
-    setTitle('');
-    setDeadlineType('None');
-    setDeadlineValue('');
+    try {
+      await onAdd(title, deadlineType, deadlineValue);
+      setTitle('');
+      setDeadlineType('Hours');
+      setDeadlineValue('1');
+      setErrorMsg('');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'MISSION PARAMETERS INCOMPLETE';
+      setErrorMsg(msg);
+    }
   };
 
   return (
@@ -36,6 +43,19 @@ export default function TaskForm({ onAdd }) {
     >
       <h2 className="form-title">New Mission</h2>
       <p className="form-hint">What are you committing to?</p>
+
+      <AnimatePresence>
+        {errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            style={{ color: 'var(--danger)', fontSize: '0.8rem', marginBottom: '0.5rem', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}
+          >
+            [!] {errorMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="input-group">
         <div className={`input-wrapper ${focused ? 'focused' : ''}`}>
@@ -58,7 +78,6 @@ export default function TaskForm({ onAdd }) {
             value={deadlineType}
             onChange={(e) => setDeadlineType(e.target.value)}
           >
-            <option value="None">No Deadline</option>
             <option value="Hours">Hours to complete</option>
             <option value="ExactTime">Exact Time</option>
           </select>

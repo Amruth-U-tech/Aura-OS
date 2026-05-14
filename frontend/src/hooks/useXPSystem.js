@@ -17,13 +17,13 @@ import { EventBus, EventTypes } from '../events/eventBus';
 import { SoundEngine } from '../services/soundEngine';
 import { Logger } from '../utils/logger';
 
-const XP_PER_LEVEL     = 100;
+const XP_PER_LEVEL = 1000;
 const LEVEL_UP_SHOW_MS = 3000; // level-up badge display duration
-const MILESTONE_EVERY  = 5;    // play achievement sound every N levels
+const MILESTONE_EVERY = 5;    // play achievement sound every N levels
 
 export function useXPSystem() {
-  const { state }  = useXPState();
-  const prevLevelRef      = useRef(state.level);
+  const { state } = useXPState();
+  const prevLevelRef = useRef(state.level);
   const [showLevelUp, setShowLevelUp] = useState(false);
 
   useEffect(() => {
@@ -56,13 +56,15 @@ export function useXPSystem() {
   }, [state.level]);
 
   // XP within the current level as 0–1 fraction for XPBar width
-  const xpIntoLevel  = state.xp % XP_PER_LEVEL;
+  const xpIntoLevel = state.xp % XP_PER_LEVEL;
   const xpPercentage = xpIntoLevel / XP_PER_LEVEL;
 
   return {
-    xp:           state.xp,
-    level:        state.level,
+    xp: state.xp,
+    level: state.level,
     xpPercentage, // 0.0–1.0
     showLevelUp,
+    decayActive: state.decayActive,
+    streakDays: state.streakDays,
   };
 }

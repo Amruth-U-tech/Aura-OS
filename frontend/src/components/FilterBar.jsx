@@ -1,5 +1,5 @@
 export default function FilterBar({ filter, setFilter }) {
-  const filters = ["All", "Active", "Completed", "High Priority", "Work", "Personal"];
+  const filters = ["All", "Active", "Completed", "Elite Priority", "High Priority", "Work", "Personal"];
 
   return (
     <div className="filters-container">
